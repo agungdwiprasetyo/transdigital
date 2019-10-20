@@ -1,4 +1,4 @@
-package customer
+package order
 
 import (
 	"agungdwiprasetyo/transdigital/task2/shared"
@@ -8,30 +8,25 @@ import (
 	"time"
 )
 
-type messageFormat struct {
-	JobID   int
-	Message string
-}
-
-// Customer model
-type Customer struct {
+// Order model
+type Order struct {
 	handlers []shared.Handler
 	prefix   string
 }
 
-// NewCustomer constructor
-func NewCustomer() *Customer {
-	prefix := fmt.Sprintf("\x1b[32;1mCustomer\x1b[0m")
-	return &Customer{
+// NewOrder constructor
+func NewOrder() *Order {
+	prefix := fmt.Sprintf("\x1b[32;1mOrder\x1b[0m")
+	return &Order{
 		handlers: []shared.Handler{
 			newHandler(prefix, "REST Handler"), newHandler(prefix, "RPC Handler"),
 		},
-		prefix: fmt.Sprintf("\x1b[32;1mCustomer\x1b[0m"),
+		prefix: fmt.Sprintf("\x1b[32;1mOrder\x1b[0m"),
 	}
 }
 
-// Run customer worker
-func (c *Customer) Run(wg *sync.WaitGroup, job chan string) {
+// Run Order worker
+func (c *Order) Run(wg *sync.WaitGroup, job chan string) {
 	wg.Add(1)
 	defer wg.Done()
 

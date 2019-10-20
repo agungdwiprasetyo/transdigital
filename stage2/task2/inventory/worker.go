@@ -1,4 +1,4 @@
-package customer
+package inventory
 
 import (
 	"agungdwiprasetyo/transdigital/task2/shared"
@@ -8,30 +8,25 @@ import (
 	"time"
 )
 
-type messageFormat struct {
-	JobID   int
-	Message string
-}
-
-// Customer model
-type Customer struct {
+// Inventory model
+type Inventory struct {
 	handlers []shared.Handler
 	prefix   string
 }
 
-// NewCustomer constructor
-func NewCustomer() *Customer {
-	prefix := fmt.Sprintf("\x1b[32;1mCustomer\x1b[0m")
-	return &Customer{
+// NewInventory constructor
+func NewInventory() *Inventory {
+	prefix := fmt.Sprintf("\x1b[32;1mInventory\x1b[0m")
+	return &Inventory{
 		handlers: []shared.Handler{
 			newHandler(prefix, "REST Handler"), newHandler(prefix, "RPC Handler"),
 		},
-		prefix: fmt.Sprintf("\x1b[32;1mCustomer\x1b[0m"),
+		prefix: fmt.Sprintf("\x1b[32;1mInventory\x1b[0m"),
 	}
 }
 
-// Run customer worker
-func (c *Customer) Run(wg *sync.WaitGroup, job chan string) {
+// Run Inventory worker
+func (c *Inventory) Run(wg *sync.WaitGroup, job chan string) {
 	wg.Add(1)
 	defer wg.Done()
 
