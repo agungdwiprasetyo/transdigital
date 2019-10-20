@@ -1,6 +1,6 @@
 package main
 
-// limit goroutine using buffered channel
+// limit goroutine using buffered channel and wait group
 
 import (
 	"agungdwiprasetyo/transdigital/task2/customer"
