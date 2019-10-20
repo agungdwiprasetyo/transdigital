@@ -1,5 +1,7 @@
 package main
 
+// Handling race condition (case checkout same product in same time) using mutual exclusion
+
 import (
 	"context"
 	"errors"
@@ -14,9 +16,22 @@ import (
 type product struct {
 	SKU   string
 	Stock int
+
+	// mutual exclusion for handle race condition if checkout product in same time
+	sync.Mutex
 }
 
-// global stocks in store (list of product object)
+type order struct {
+	SKU   string
+	Total int
+}
+
+type user struct {
+	ID    string
+	Order *order
+}
+
+// global stocks in store database (list of product object)
 var products = []*product{
 	{
 		SKU:   "SKU001",
@@ -37,34 +52,41 @@ func findSkuInProduct(sku string) *product {
 	return nil
 }
 
-// lock global mutual exclusion
-var lock sync.Mutex
-
-func checkout(skuNo string) error {
-	// lock for handle race condition if checkout in same time
-	lock.Lock()
-	defer lock.Unlock()
-
-	p := findSkuInProduct(skuNo)
+func checkout(ord *order) error {
+	p := findSkuInProduct(ord.SKU)
 	if p == nil {
 		return errors.New("product not found")
 	}
 
+	// lock for handle if this function call with goroutine
+	p.Lock()
+	defer p.Unlock()
+
 	if p.Stock == 0 {
-		return fmt.Errorf("product %s out of stock", skuNo)
+		return fmt.Errorf("product %s out of stock", ord.SKU)
 	}
 
 	time.Sleep(3 * time.Second) // assume heavy process when success take product
 
+	// validate stock and total order
+	if p.Stock < ord.Total {
+		return errors.New("insufficient stock")
+	}
+
 	// update product stock
-	p.Stock--
+	p.Stock -= ord.Total
 
 	return nil
 }
 
-func handler(sku string, result chan error) {
-	fmt.Printf("%s: handling request checkout sku %s\n", time.Now().Format(time.RFC3339Nano), sku)
-	result <- checkout(sku)
+func handler(u *user) {
+	fmt.Printf("%s: handling request from %s to checkout product %s\n", time.Now().Format(time.RFC3339Nano), u.ID, u.Order.SKU)
+	err := checkout(u.Order)
+	if err != nil {
+		fmt.Printf("\x1b[31;1m%s can't checkout SKU %s, Error: %v\x1b[0m\n", u.ID, u.Order.SKU, err)
+	} else {
+		fmt.Printf("\x1b[32;1mProduct %s success taken by %s\x1b[0m\n", u.Order.SKU, u.ID)
+	}
 }
 
 func main() {
@@ -74,25 +96,37 @@ func main() {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt, os.Kill)
 
-	userA := make(chan error)
-	userB := make(chan error)
-	userC := make(chan error)
 	sku := "SKU001"
+	var activeUser []*user
 
-	// user A and user B (and user C) checkout in same time
-	go handler(sku, userA)
-	go handler(sku, userB)
-	go handler(sku, userC)
+	userA := &user{
+		ID: "UserA",
+		Order: &order{
+			SKU:   sku,
+			Total: 1,
+		},
+	}
+	activeUser = append(activeUser, userA)
+	userB := &user{
+		ID: "UserB",
+		Order: &order{
+			SKU:   sku,
+			Total: 1,
+		},
+	}
+	activeUser = append(activeUser, userB)
+	userC := &user{
+		ID: "UserC",
+		Order: &order{
+			SKU:   sku,
+			Total: 1,
+		},
+	}
+	activeUser = append(activeUser, userC)
 
-	// take result each channel (user)
-	if err := <-userA; err != nil {
-		fmt.Printf("User A can't checkout SKU %s, %v\n", sku, err)
-	}
-	if err := <-userB; err != nil {
-		fmt.Printf("User B can't checkout SKU %s, %v\n", sku, err)
-	}
-	if err := <-userC; err != nil {
-		fmt.Printf("User C can't checkout SKU %s, %v\n", sku, err)
+	// user A and user B (and additional user C) checkout in same time
+	for _, u := range activeUser {
+		go handler(u)
 	}
 
 	// wait timeout or interupt or kill signal channel

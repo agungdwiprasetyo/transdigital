@@ -21,7 +21,7 @@ func send(sch chan int, results chan int) {
 }
 func enabler(results chan int) {
 	for {
-		fmt.Println(<-results)
+		<-results
 	}
 }
 func pub(ch chan string, n int) {
