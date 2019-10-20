@@ -3,12 +3,8 @@ package main
 // Handling race condition (case checkout same product in same time) using mutual exclusion
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-	"os/signal"
 	"sync"
 	"time"
 )
@@ -17,7 +13,7 @@ type product struct {
 	SKU   string
 	Stock int
 
-	// mutual exclusion for handle race condition if checkout product in same time
+	// mutual exclusion for handle race condition if checkout same product in same time
 	sync.Mutex
 }
 
@@ -68,11 +64,6 @@ func checkout(ord *order) error {
 
 	time.Sleep(3 * time.Second) // assume heavy process when success take product
 
-	// validate stock and total order
-	if p.Stock < ord.Total {
-		return errors.New("insufficient stock")
-	}
-
 	// update product stock
 	p.Stock -= ord.Total
 
@@ -90,11 +81,10 @@ func handler(u *user) {
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	quit := make(chan os.Signal)
-	signal.Notify(quit, os.Interrupt, os.Kill)
+	// list product
+	for _, p := range products {
+		fmt.Printf("\x1b[33;1m%s\t: %d\x1b[0m\n", p.SKU, p.Stock)
+	}
 
 	sku := "SKU001"
 	var activeUser []*user
@@ -125,21 +115,21 @@ func main() {
 	activeUser = append(activeUser, userC)
 
 	// user A and user B (and additional user C) checkout in same time
+	var wg sync.WaitGroup
 	for _, u := range activeUser {
-		go handler(u)
+		wg.Add(1)
+		go func(us *user) {
+			defer wg.Done()
+			handler(us)
+		}(u)
 	}
 
-	// wait timeout or interupt or kill signal channel
-	select {
-	case <-quit:
-		log.Println("os interrupted")
-	case <-ctx.Done():
-		log.Println("context timeout")
-	}
+	// wait all goroutine
+	wg.Wait()
 
 	p := findSkuInProduct(sku)
 	if p.Stock < 0 {
-		panic(fmt.Sprintf("\x1b[31;1mWRONG ANSWER SOLUTION, STOCK IS LESS THAN ZERO (%d)\x1b[0m", p.Stock))
+		panic(fmt.Sprintf("\x1b[31;1mWRONG ANSWER SOLUTION, STOCK %s IS LESS THAN ZERO (%d)\x1b[0m", p.SKU, p.Stock))
 	}
 	fmt.Printf("\x1b[32;1mOK\x1b[0m\n")
 }
